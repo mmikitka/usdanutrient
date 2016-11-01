@@ -76,7 +76,6 @@ class FoodNutrientData(Base):
     stat_comments = Column(String(10))
     last_modified = Column(Date)
     confidence_code = Column(String(1))
-    data_sources = relationship("FoodNutrientDataSourceMap")
 
     def __repr__(self):
         return "<FoodNutrientData(food_id='{}', nutrient_id='{}', value='{}'>".format(
