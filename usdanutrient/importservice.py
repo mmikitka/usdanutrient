@@ -1,9 +1,8 @@
 import os
 import re
 import csv
-from sqlalchemy import Boolean, Date, desc, func, Integer, Numeric
+from sqlalchemy import Boolean, Date, func, Integer, Numeric
 from sqlalchemy.orm import sessionmaker
-from decimal import Decimal
 from datetime import date
 import model
 
@@ -36,7 +35,7 @@ def db_import_file(engine, table_class, fname, col_order):
                     if col_value == '':
                         col_value = None
                     else:
-                        col_value = Decimal(col_value)
+                        col_value = float(col_value)
 
                 if type(table_class.__dict__[col_name].type) is Date:
                     match_date = re.match('([\d]{2})/([\d]{4})', col_value)
@@ -102,9 +101,6 @@ def db_import(engine, data_dir):
     model.Base.metadata.drop_all(engine)
     model.Base.metadata.create_all(engine)
 
-    Session = sessionmaker(bind=engine)
-    session = Session()
-
     fnames = os.listdir(data_dir)
     for fname in fnames:
         table_class = None
@@ -156,11 +152,22 @@ def db_import(engine, data_dir):
             table_class = model.Weight
             col_order = ['food_id', 'sequence', 'amount', 'measurement_desc',
                          'grams', 'num_data_points', 'std_dev']
-        elif fname == 'local_food_weight_alias.csv':
-            db_import_file_weight_alias(engine, session, full_fname)
         else:
             print("No handler for file {}".format(full_fname))
 
         if col_order:
             print("Processing file '{}' with class '{}'".format(full_fname, table_class.__name__))
             db_import_file(engine, table_class, full_fname, col_order)
+
+def db_import_custom(engine, data_dir):
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    fnames = os.listdir(data_dir)
+    for fname in fnames:
+        full_fname = os.path.join(data_dir, fname)
+
+        if fname == 'local_food_weight_alias.csv':
+            db_import_file_weight_alias(engine, session, full_fname)
+        else:
+            print("No handler for file {}".format(full_fname))

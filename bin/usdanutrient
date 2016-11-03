@@ -28,3 +28,6 @@ if __name__ == '__main__':
         if args.command[0] == 'import':
             data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data/release" + args.release)
             importservice.db_import(engine, data_dir)
+
+            custom_data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data/custom")
+            importservice.db_import_custom(engine, custom_data_dir)
