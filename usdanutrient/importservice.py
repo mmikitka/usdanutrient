@@ -4,6 +4,7 @@ import csv
 from sqlalchemy import Boolean, Date, func, Integer, Numeric
 from sqlalchemy.orm import sessionmaker
 from datetime import date
+from decimal import Decimal
 import model
 
 def db_import_file(engine, table_class, fname, col_order):
@@ -35,7 +36,7 @@ def db_import_file(engine, table_class, fname, col_order):
                     if col_value == '':
                         col_value = None
                     else:
-                        col_value = float(col_value)
+                        col_value = Decimal(col_value)
 
                 if type(table_class.__dict__[col_name].type) is Date:
                     match_date = re.match('([\d]{2})/([\d]{4})', col_value)
