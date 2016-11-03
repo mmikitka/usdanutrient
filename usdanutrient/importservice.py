@@ -1,6 +1,8 @@
 import os
 import re
-from sqlalchemy import Boolean, Date, Integer, Numeric
+import csv
+from sqlalchemy import Boolean, Date, desc, func, Integer, Numeric
+from sqlalchemy.orm import sessionmaker
 from decimal import Decimal
 from datetime import date
 import model
@@ -58,9 +60,50 @@ def db_import_file(engine, table_class, fname, col_order):
 
         engine.execute(table_class.__table__.insert(), rows)
 
+def db_import_file_weight_alias(engine, session, fname):
+    with open(fname) as f:
+        csvreader = csv.reader(f, delimiter='|')
+        rows_out = []
+        for row_in in csvreader:
+            food = session.\
+                    query(model.Food).\
+                    filter(model.Food.long_desc == row_in[0]).\
+                    one()
+
+            weight = session.\
+                    query(model.Weight).\
+                    filter(model.Weight.food_id == food.id).\
+                    filter(model.Weight.measurement_desc == row_in[1]).\
+                    one()
+
+            prev_sequence = session.\
+                    query(func.max(model.Weight.sequence)).\
+                    filter(model.Weight.food_id == food.id).\
+                    scalar()
+
+            sequence = 1
+            if prev_sequence:
+                sequence = int(prev_sequence) + 1
+
+            row_out = {
+                'food_id': food.id,
+                'sequence': sequence,
+                'amount': weight.amount,
+                'measurement_desc': row_in[2],
+                'grams': weight.grams,
+                'num_data_points': weight.num_data_points,
+                'std_dev': weight.std_dev
+            }
+            rows_out.append(row_out)
+
+        engine.execute(model.Weight.__table__.insert(), rows_out)
+
 def db_import(engine, data_dir):
     model.Base.metadata.drop_all(engine)
     model.Base.metadata.create_all(engine)
+
+    Session = sessionmaker(bind=engine)
+    session = Session()
 
     fnames = os.listdir(data_dir)
     for fname in fnames:
@@ -113,6 +156,8 @@ def db_import(engine, data_dir):
             table_class = model.Weight
             col_order = ['food_id', 'sequence', 'amount', 'measurement_desc',
                          'grams', 'num_data_points', 'std_dev']
+        elif fname == 'local_food_weight_alias.csv':
+            db_import_file_weight_alias(engine, session, full_fname)
         else:
             print("No handler for file {}".format(full_fname))
 
