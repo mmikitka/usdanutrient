@@ -33,13 +33,23 @@ class Food(Base):
     carb_calories_factor = Column(Numeric)
 
     group = relationship("FoodGroup")
-    nutrient_data = relationship("FoodNutrientData")
+    nutrients_data = relationship("FoodNutrientData")
     weights = relationship("Weight")
     languals = relationship("FoodLangualMap")
 
     def __repr__(self):
         return "<Food(id='{}', long_desc='{}', short_desc='{}')>".format(
                     [self.id, self.long_desc, self.short_desc])
+
+class NutrientCategory(Base):
+    __tablename__ = 'nutrient_category'
+
+    id = Column(Integer, autoincrement=True, primary_key=True, nullable=False)
+    name = Column(String(60), nullable=False)
+
+    def __repr__(self):
+        return "<NutrientCategory(id='{}', name='{}')>".format(
+                    [self.id, self.name])
 
 class Nutrient(Base):
     __tablename__ = 'nutrient'
@@ -50,6 +60,11 @@ class Nutrient(Base):
     num_decimals = Column(Integer, nullable=False)
     sr_order = Column(Integer, nullable=False)
     infoods_tag = Column(String(20))
+
+    # Custom field
+    category_id = Column(Integer, ForeignKey('nutrient_category.id'))
+
+    category = relationship("NutrientCategory")
 
     def __repr__(self):
         return "<Nutrient(id='{}', name='{}', units='{}')>".format(
@@ -76,6 +91,11 @@ class FoodNutrientData(Base):
     stat_comments = Column(String(10))
     last_modified = Column(Date)
     confidence_code = Column(String(1))
+
+    food = relationship("Food")
+    nutrient = relationship("Nutrient")
+    source_code = relationship("SourceCode")
+    derivation_code = relationship("DerivationCode")
 
     def __repr__(self):
         return "<FoodNutrientData(food_id='{}', nutrient_id='{}', value='{}'>".format(
@@ -132,6 +152,8 @@ class Weight(Base):
     grams = Column(Numeric, nullable=False)
     num_data_points = Column(Integer)
     std_dev = Column(Numeric)
+
+    food = relationship("Food")
 
     def __repr__(self):
         return "<Weight(food_id='{}', sequence='{}', amount='{}', measurement_desc='{}', grams='{}')>".format(

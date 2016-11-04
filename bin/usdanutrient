@@ -5,6 +5,7 @@ import os
 import sys
 import yaml
 from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 try:
     # Use the system package first
@@ -25,9 +26,12 @@ if __name__ == '__main__':
         config = yaml.safe_load(f)
         engine = create_engine(config['database']['uri'])
 
+        Session = sessionmaker(bind=engine)
+        session = Session()
+
         if args.command[0] == 'import':
             data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data/release" + args.release)
-            importservice.db_import(engine, data_dir)
+            importservice.db_import(engine, session, data_dir)
 
             custom_data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data/custom")
-            importservice.db_import_custom(engine, custom_data_dir)
+            importservice.db_import_custom(engine, session, custom_data_dir)

@@ -2,7 +2,6 @@ import os
 import re
 import csv
 from sqlalchemy import Boolean, Date, func, Integer, Numeric
-from sqlalchemy.orm import sessionmaker
 from datetime import date
 from decimal import Decimal
 import model
@@ -160,10 +159,7 @@ def db_import(engine, data_dir):
             print("Processing file '{}' with class '{}'".format(full_fname, table_class.__name__))
             db_import_file(engine, table_class, full_fname, col_order)
 
-def db_import_custom(engine, data_dir):
-    Session = sessionmaker(bind=engine)
-    session = Session()
-
+def db_import_custom(engine, session, data_dir):
     fnames = os.listdir(data_dir)
     for fname in fnames:
         full_fname = os.path.join(data_dir, fname)
