@@ -33,7 +33,7 @@ class Food(Base):
     carb_calories_factor = Column(Numeric)
 
     group = relationship("FoodGroup")
-    nutrients_data = relationship("FoodNutrientData")
+    nutrient_data = relationship("FoodNutrientData")
     weights = relationship("Weight")
     languals = relationship("FoodLangualMap")
 
