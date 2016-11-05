@@ -19,6 +19,7 @@ if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser(description='Interact with the USDA Nutrient Database')
     arg_parser.add_argument('command', help='Command to invoke', nargs=1, choices=['import'])
     arg_parser.add_argument('--release', '-r', dest='release', help='Release version of the USDA Nutrient Database', choices=['28'], default='28')
+    arg_parser.add_argument('--type', '-t', dest='type', help='Type of files to import', nargs='+', choices=['usda', 'custom'], default=[])
     args = arg_parser.parse_args()
 
     config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../conf/usdanutrient.yml")
@@ -30,8 +31,10 @@ if __name__ == '__main__':
         session = Session()
 
         if args.command[0] == 'import':
-            data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data/release" + args.release)
-            importservice.db_import(engine, session, data_dir)
+            if 'usda' in args.type:
+                data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data/release" + args.release)
+                importservice.db_import(engine, session, data_dir)
 
-            custom_data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data/custom")
-            importservice.db_import_custom(engine, session, custom_data_dir)
+            if 'custom' in args.type:
+                custom_data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data/custom")
+                importservice.db_import_custom(engine, session, custom_data_dir)

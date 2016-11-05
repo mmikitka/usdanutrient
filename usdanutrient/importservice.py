@@ -1,5 +1,7 @@
+import inspect
 import os
 import re
+import sys
 import csv
 from sqlalchemy import Boolean, Date, func, Integer, Numeric
 from datetime import date
@@ -59,47 +61,125 @@ def db_import_file(engine, table_class, fname, col_order):
 
         engine.execute(table_class.__table__.insert(), rows)
 
-def db_import_file_weight_alias(engine, session, fname):
+def db_import_custom_file(processing_callback, callback_args):
+    fname = callback_args['fname']
+    engine = callback_args['engine']
+    table_class = callback_args['table_class']
+
+    print("Processing file '{}'".format(fname))
+
     with open(fname) as f:
         csvreader = csv.reader(f, delimiter='|')
         rows_out = []
         for row_in in csvreader:
-            food = session.\
-                    query(model.Food).\
-                    filter(model.Food.long_desc == row_in[0]).\
-                    one()
-
-            weight = session.\
-                    query(model.Weight).\
-                    filter(model.Weight.food_id == food.id).\
-                    filter(model.Weight.measurement_desc == row_in[1]).\
-                    one()
-
-            prev_sequence = session.\
-                    query(func.max(model.Weight.sequence)).\
-                    filter(model.Weight.food_id == food.id).\
-                    scalar()
-
-            sequence = 1
-            if prev_sequence:
-                sequence = int(prev_sequence) + 1
-
-            row_out = {
-                'food_id': food.id,
-                'sequence': sequence,
-                'amount': weight.amount,
-                'measurement_desc': row_in[2],
-                'grams': weight.grams,
-                'num_data_points': weight.num_data_points,
-                'std_dev': weight.std_dev
-            }
+            row_out = processing_callback(row_in, callback_args)
             rows_out.append(row_out)
 
-        engine.execute(model.Weight.__table__.insert(), rows_out)
+        engine.execute(table_class.__table__.insert(), rows_out)
 
-def db_import(engine, data_dir):
-    model.Base.metadata.drop_all(engine)
-    model.Base.metadata.create_all(engine)
+def process_row_generic(row_in, args):
+    row_out = {}
+    col_order = args['col_order']
+    table_class = args['table_class']
+
+    for ind in range(len(col_order)):
+        col_name = col_order[ind]
+        col_value = row_in[ind]
+
+        if type(table_class.__dict__[col_name].type) is Integer:
+            if col_value == '':
+                col_value = None
+            else:
+                col_value = int(col_value)
+
+        if type(table_class.__dict__[col_name].type) is Numeric:
+            if col_value == '':
+                col_value = None
+            else:
+                col_value = Decimal(col_value)
+
+        row_out[col_name] = col_value
+
+    return row_out
+
+def process_row_local_food_weight_alias(row_in, args):
+    session = args['session']
+
+    food = session.\
+            query(model.Food).\
+            filter(model.Food.long_desc == row_in[0]).\
+            one()
+
+    weight = session.\
+            query(model.Weight).\
+            filter(model.Weight.food_id == food.id).\
+            filter(model.Weight.measurement_desc == row_in[1]).\
+            one()
+
+    prev_sequence = session.\
+            query(func.max(model.Weight.sequence)).\
+            filter(model.Weight.food_id == food.id).\
+            scalar()
+
+    sequence = 1
+    if prev_sequence:
+        sequence = int(prev_sequence) + 1
+
+    return {
+        'food_id': food.id,
+        'sequence': sequence,
+        'amount': weight.amount,
+        'measurement_desc': row_in[2],
+        'grams': weight.grams,
+        'num_data_points': weight.num_data_points,
+        'std_dev': weight.std_dev
+    }
+
+def db_import_nutrient_category_map_file(engine, session, fname):
+    print("Processing file '{}'".format(fname))
+
+    # Sigh. There are two instances of the nutrient, 'Energy', each
+    # with a different unit of measurement: kcal and kJ. Rename
+    # the nutrient before proceeding.
+    energies = session.\
+        query(model.Nutrient).\
+        filter(model.Nutrient.name == 'Energy')
+    for energy in energies:
+        if energy.units == 'kcal':
+            energy.name = 'Energy (kcal)'
+        elif energy.units == 'kJ':
+            energy.name = 'Energy (kJ)'
+        session.add(energy)
+
+    session.commit()
+
+    with open(fname) as f:
+        csvreader = csv.reader(f, delimiter='|')
+        rows_out = []
+        for row_in in csvreader:
+            nutrient = session.\
+                query(model.Nutrient).\
+                filter(model.Nutrient.name == row_in[0]).\
+                one()
+
+            category = session.\
+                query(model.NutrientCategory).\
+                filter(model.NutrientCategory.name == row_in[1]).\
+                one()
+
+            nutrient.category_id = category.id
+            session.add(nutrient)
+
+        session.commit()
+
+def db_import(engine, session, data_dir):
+    # Only drop the USDA tables as the model may be extended by another
+    # module.
+    for name, obj in inspect.getmembers(sys.modules['usdanutrient.model']):
+        if (inspect.isclass(obj)
+                and obj.__module__ == 'usdanutrient.model'):
+            obj.__table__.drop(engine, checkfirst=True)
+            obj.__table__.create(engine)
 
     fnames = os.listdir(data_dir)
     for fname in fnames:
@@ -160,11 +240,30 @@ def db_import(engine, data_dir):
             db_import_file(engine, table_class, full_fname, col_order)
 
 def db_import_custom(engine, session, data_dir):
-    fnames = os.listdir(data_dir)
-    for fname in fnames:
-        full_fname = os.path.join(data_dir, fname)
+    model.NutrientCategory.__table__.drop(engine, checkfirst=True)
+    model.NutrientCategory.__table__.create(engine)
 
-        if fname == 'local_food_weight_alias.csv':
-            db_import_file_weight_alias(engine, session, full_fname)
-        else:
-            print("No handler for file {}".format(full_fname))
+    import_order = ['local_food_weight_alias.csv', 'nutrient_category.csv',
+                    'nutrient_category_map.csv']
+    for fname in import_order:
+        full_fname = os.path.join(data_dir, fname)
+        if os.access(full_fname, os.R_OK):
+            processing_callback = process_row_generic
+            callback_args = {'engine': engine,
+                             'session': session,
+                             'fname': full_fname}
+
+            if fname == 'local_food_weight_alias.csv':
+                callback_args['table_class'] = model.Weight
+                processing_callback = process_row_local_food_weight_alias
+            elif fname == 'nutrient_category.csv':
+                callback_args['table_class'] = model.NutrientCategory
+                callback_args['col_order'] = ['name']
+            elif fname == 'nutrient_category_map.csv':
+                processing_callback = None
+                db_import_nutrient_category_map_file(engine, session, full_fname)
+            else:
+                print("No handler for file {}".format(full_fname))
+
+            if processing_callback:
+                db_import_custom_file(processing_callback, callback_args)
