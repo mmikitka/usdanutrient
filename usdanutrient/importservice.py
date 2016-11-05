@@ -32,14 +32,12 @@ def db_import_file(engine, table_class, fname, col_order):
                         col_value = None
                     else:
                         col_value = int(col_value)
-
-                if type(table_class.__dict__[col_name].type) is Numeric:
+                elif type(table_class.__dict__[col_name].type) is Numeric:
                     if col_value == '':
                         col_value = None
                     else:
                         col_value = Decimal(col_value)
-
-                if type(table_class.__dict__[col_name].type) is Date:
+                elif type(table_class.__dict__[col_name].type) is Date:
                     match_date = re.match('([\d]{2})/([\d]{4})', col_value)
                     if match_date:
                         month = match_date.group(1)
@@ -47,8 +45,7 @@ def db_import_file(engine, table_class, fname, col_order):
                         col_value = date(int(year), int(month), 1)
                     else:
                         col_value = None
-
-                if type(table_class.__dict__[col_name].type) is Boolean:
+                elif type(table_class.__dict__[col_name].type) is Boolean:
                     if (col_value.upper() == 'N'
                             or col_value == '0'
                             or not col_value):
