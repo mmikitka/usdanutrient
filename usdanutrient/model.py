@@ -12,7 +12,7 @@ class FoodGroup(Base):
 
     def __repr__(self):
         return "<FoodGroup(id='{}', name='{}')>".format(
-                    [self.id, self.name])
+                    self.id, self.name)
 
 class Food(Base):
     __tablename__ = 'food'
@@ -39,7 +39,7 @@ class Food(Base):
 
     def __repr__(self):
         return "<Food(id='{}', long_desc='{}', short_desc='{}')>".format(
-                    [self.id, self.long_desc, self.short_desc])
+                    self.id, self.long_desc, self.short_desc)
 
 class NutrientCategory(Base):
     __tablename__ = 'nutrient_category'
@@ -49,7 +49,7 @@ class NutrientCategory(Base):
 
     def __repr__(self):
         return "<NutrientCategory(id='{}', name='{}')>".format(
-                    [self.id, self.name])
+                    self.id, self.name)
 
 class Nutrient(Base):
     __tablename__ = 'nutrient'
@@ -68,7 +68,7 @@ class Nutrient(Base):
 
     def __repr__(self):
         return "<Nutrient(id='{}', name='{}', units='{}')>".format(
-                    [self.id, self.name, self.units])
+                    self.id, self.name, self.units)
 
 class FoodNutrientData(Base):
     __tablename__ = 'food_nutrient_data'
@@ -99,7 +99,7 @@ class FoodNutrientData(Base):
 
     def __repr__(self):
         return "<FoodNutrientData(food_id='{}', nutrient_id='{}', value='{}'>".format(
-                    [self.id, self.nutrient_id, self.value])
+                    self.id, self.nutrient_id, self.value)
 
 class Langual(Base):
     __tablename__ = 'langual'
@@ -109,7 +109,7 @@ class Langual(Base):
 
     def __repr__(self):
         return "<Langual(id='{}', desc='{}')>".format(
-                    [self.id, self.desc])
+                    self.id, self.desc)
 
 class FoodLangualMap(Base):
     __tablename__ = 'food_langual_map'
@@ -120,7 +120,7 @@ class FoodLangualMap(Base):
 
     def __repr__(self):
         return "<FoodLangualMap(food_id='{}', langual_id='{}')>".format(
-                    [self.food_id, self.langual_id])
+                    self.food_id, self.langual_id)
 
 class SourceCode(Base):
     __tablename__ = 'source_code'
@@ -130,7 +130,7 @@ class SourceCode(Base):
 
     def __repr__(self):
         return "<SourceCode(id='{}', desc='{}')>".format(
-                    [self.id, self.desc])
+                    self.id, self.desc)
 
 class DerivationCode(Base):
     __tablename__ = 'derivation_code'
@@ -140,7 +140,7 @@ class DerivationCode(Base):
 
     def __repr__(self):
         return "<DerivationCode(id='{}', desc='{}')>".format(
-                    [self.id, self.desc])
+                    self.id, self.desc)
 
 class Weight(Base):
     __tablename__ = 'weight'
@@ -157,7 +157,7 @@ class Weight(Base):
 
     def __repr__(self):
         return "<Weight(food_id='{}', sequence='{}', amount='{}', measurement_desc='{}', grams='{}')>".format(
-                    [self.food_id, self.sequence, self.amount, self.measurement_desc, self.grams])
+                    self.food_id, self.sequence, self.amount, self.measurement_desc, self.grams)
 
 class Footnote(Base):
     __tablename__ = 'footnote'
@@ -173,7 +173,7 @@ class Footnote(Base):
 
     def __repr__(self):
         return "<Footnote(food_id='{}', id='{}', type='{}', nutrient_id='{}', desc='{}')>".format(
-                    [self.food_id, self.id, self.type, self.nutrient_id, self.desc])
+                    self.food_id, self.id, self.type, self.nutrient_id, self.desc)
 
 class DataSource(Base):
     __tablename__ = 'data_source'
@@ -190,7 +190,7 @@ class DataSource(Base):
 
     def __repr__(self):
         return "<DataSource(id='{}', authors='{}', title='{}', year='{}', journal='{}')>".format(
-                    [self.id, self.authors, self.title, self.year, self.journal])
+                    self.id, self.authors, self.title, self.year, self.journal)
 
 class FoodNutrientDataSourceMap(Base):
     __tablename__ = 'food_nutrient_data_source_map'
@@ -202,4 +202,4 @@ class FoodNutrientDataSourceMap(Base):
 
     def __repr__(self):
         return "<FoodNutrientDataSourceMap(food_id='{}', nutrient_id='{}', data_source_id='{}')>".format(
-            [self.food_id, self.data_source_id, self.data_source])
+            self.food_id, self.data_source_id, self.data_source)
