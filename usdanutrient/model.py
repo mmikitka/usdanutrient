@@ -33,9 +33,9 @@ class Food(Base):
     carb_calories_factor = Column(Numeric)
 
     group = relationship("FoodGroup")
-    nutrient_data = relationship("FoodNutrientData")
-    weights = relationship("Weight")
-    languals = relationship("FoodLangualMap")
+    nutrient_data = relationship("FoodNutrientData", cascade="all, delete, delete-orphan")
+    weights = relationship("Weight", cascade="all, delete, delete-orphan")
+    languals = relationship("FoodLangualMap", cascade="all, delete, delete-orphan")
 
     def __repr__(self):
         return "<Food(id='{}', long_desc='{}', short_desc='{}')>".format(
