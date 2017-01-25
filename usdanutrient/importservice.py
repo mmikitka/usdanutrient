@@ -3,6 +3,7 @@ import os
 import re
 import sys
 import csv
+import sqlalchemy.orm.exc
 from sqlalchemy import Boolean, Date, func, Integer, Numeric
 from datetime import date
 from decimal import Decimal
@@ -71,10 +72,11 @@ def db_import_custom_file(processing_callback, callback_args):
         rows_out = []
         for row_in in csvreader:
             row_out = processing_callback(row_in, callback_args)
-            rows_out.append(row_out)
-            if not bulk:
-                engine.execute(table_class.__table__.insert(), rows_out)
-                rows_out = []
+            if row_out:
+                rows_out.append(row_out)
+                if not bulk:
+                    engine.execute(table_class.__table__.insert(), rows_out)
+                    rows_out = []
 
         if bulk and rows_out:
             engine.execute(table_class.__table__.insert(), rows_out)
@@ -103,6 +105,31 @@ def process_row_generic(row_in, args):
         row_out[col_name] = col_value
 
     return row_out
+
+def process_row_local_food(row_in, args):
+    session = args['session']
+    result = None
+
+    foods = session.\
+            query(model.Food).\
+            filter(model.Food.long_desc == row_in[0])
+    for food in foods:
+        session.delete(food)
+    session.commit()
+
+    food_group = session.\
+        query(model.FoodGroup).\
+        filter(model.FoodGroup.name == row_in[3]).\
+        one()
+
+    result = {
+        'long_desc': row_in[0],
+        'short_desc': row_in[1],
+        'manufacturer': row_in[2],
+        'group_id': food_group.id,
+        'refuse_pct': row_in[4]
+    }
+    return result
 
 def process_row_local_food_weight(row_in, args):
     session = args['session']
@@ -199,6 +226,37 @@ def db_import_nutrient_category_map_file(engine, session, fname):
 
         session.commit()
 
+def process_row_local_food_nutrient_data(row_in, args):
+    session = args['session']
+
+    try:
+        food = session.\
+            query(model.Food).\
+            filter(model.Food.long_desc == row_in[0]).\
+            one()
+    except sqlalchemy.orm.exc.NoResultFound:
+        raise ValueError("Unable to find USDA Food '{}'".format(row_in[0]))
+    except sqlalchemy.orm.exc.MultipleResultsFound:
+        raise ValueError("Multiple results of food '{}'".format(row_in[0]))
+
+    try:
+        nutrient = session.\
+            query(model.Nutrient).\
+            filter(model.Nutrient.name == row_in[1]).\
+            one()
+    except sqlalchemy.orm.exc.NoResultFound:
+        raise ValueError("Unable to find nutrient '{}'".format(row_in[1]))
+    except sqlalchemy.orm.exc.MultipleResultsFound:
+        raise ValueError("Multiple results of nutrient '{}'".format(row_in[1]))
+
+    return {
+        'food_id': food.id,
+        'nutrient_id': nutrient.id,
+        'source_code_id': 9,
+        'value': row_in[2],
+        'num_data_points': 0
+    }
+
 def db_import(engine, session, data_dir):
     # Only drop the USDA tables as the model may be extended by another
     # module.
@@ -270,8 +328,9 @@ def db_import_custom(engine, session, data_dir):
     model.NutrientCategory.__table__.drop(engine, checkfirst=True)
     model.NutrientCategory.__table__.create(engine)
 
-    import_order = ['local_food_weight.csv', 'local_food_weight_alias.csv',
-                    'nutrient_category.csv', 'nutrient_category_map.csv']
+    import_order = ['local_food.csv', 'local_food_weight.csv', 'local_food_weight_alias.csv',
+                    'nutrient_category.csv', 'nutrient_category_map.csv',
+                    'local_food_nutrient_data.csv']
     for fname in import_order:
         full_fname = os.path.join(data_dir, fname)
         if os.access(full_fname, os.R_OK):
@@ -281,7 +340,10 @@ def db_import_custom(engine, session, data_dir):
                              'fname': full_fname,
                              'bulk': True}
 
-            if fname == 'local_food_weight.csv':
+            if fname == 'local_food.csv':
+                callback_args['table_class'] = model.Food
+                processing_callback = process_row_local_food
+            elif fname == 'local_food_weight.csv':
                 callback_args['table_class'] = model.Weight
                 callback_args['bulk'] = False
                 processing_callback = process_row_local_food_weight
@@ -295,6 +357,9 @@ def db_import_custom(engine, session, data_dir):
             elif fname == 'nutrient_category_map.csv':
                 processing_callback = None
                 db_import_nutrient_category_map_file(engine, session, full_fname)
+            elif fname == 'local_food_nutrient_data.csv':
+                callback_args['table_class'] = model.FoodNutrientData
+                processing_callback = process_row_local_food_nutrient_data
             else:
                 print("No handler for file {}".format(full_fname))
 
