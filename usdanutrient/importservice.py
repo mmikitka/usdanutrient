@@ -62,6 +62,7 @@ def db_import_custom_file(processing_callback, callback_args):
     fname = callback_args['fname']
     engine = callback_args['engine']
     table_class = callback_args['table_class']
+    bulk = callback_args['bulk']
 
     print("Processing file '{}'".format(fname))
 
@@ -71,8 +72,12 @@ def db_import_custom_file(processing_callback, callback_args):
         for row_in in csvreader:
             row_out = processing_callback(row_in, callback_args)
             rows_out.append(row_out)
+            if not bulk:
+                engine.execute(table_class.__table__.insert(), rows_out)
+                rows_out = []
 
-        engine.execute(table_class.__table__.insert(), rows_out)
+        if bulk and rows_out:
+            engine.execute(table_class.__table__.insert(), rows_out)
 
 def process_row_generic(row_in, args):
     row_out = {}
@@ -98,6 +103,31 @@ def process_row_generic(row_in, args):
         row_out[col_name] = col_value
 
     return row_out
+
+def process_row_local_food_weight(row_in, args):
+    session = args['session']
+
+    food = session.\
+            query(model.Food).\
+            filter(model.Food.long_desc == row_in[0]).\
+            one()
+
+    prev_sequence = session.\
+            query(func.max(model.Weight.sequence)).\
+            filter(model.Weight.food_id == food.id).\
+            scalar()
+
+    sequence = 1
+    if prev_sequence:
+        sequence = int(prev_sequence) + 1
+
+    return {
+        'food_id': food.id,
+        'sequence': sequence,
+        'amount': row_in[1],
+        'measurement_desc': row_in[2],
+        'grams': row_in[3]
+    }
 
 def process_row_local_food_weight_alias(row_in, args):
     session = args['session']
@@ -240,18 +270,24 @@ def db_import_custom(engine, session, data_dir):
     model.NutrientCategory.__table__.drop(engine, checkfirst=True)
     model.NutrientCategory.__table__.create(engine)
 
-    import_order = ['local_food_weight_alias.csv', 'nutrient_category.csv',
-                    'nutrient_category_map.csv']
+    import_order = ['local_food_weight.csv', 'local_food_weight_alias.csv',
+                    'nutrient_category.csv', 'nutrient_category_map.csv']
     for fname in import_order:
         full_fname = os.path.join(data_dir, fname)
         if os.access(full_fname, os.R_OK):
             processing_callback = process_row_generic
             callback_args = {'engine': engine,
                              'session': session,
-                             'fname': full_fname}
+                             'fname': full_fname,
+                             'bulk': True}
 
-            if fname == 'local_food_weight_alias.csv':
+            if fname == 'local_food_weight.csv':
                 callback_args['table_class'] = model.Weight
+                callback_args['bulk'] = False
+                processing_callback = process_row_local_food_weight
+            elif fname == 'local_food_weight_alias.csv':
+                callback_args['table_class'] = model.Weight
+                callback_args['bulk'] = False
                 processing_callback = process_row_local_food_weight_alias
             elif fname == 'nutrient_category.csv':
                 callback_args['table_class'] = model.NutrientCategory
