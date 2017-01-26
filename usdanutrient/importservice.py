@@ -4,6 +4,7 @@ import re
 import sys
 import csv
 import sqlalchemy.orm.exc
+from sqlalchemy.orm.session import make_transient
 from sqlalchemy import Boolean, Date, func, Integer, Numeric
 from datetime import date
 from decimal import Decimal
@@ -257,6 +258,48 @@ def process_row_local_food_nutrient_data(row_in, args):
         'num_data_points': 0
     }
 
+def process_row_local_food_nutrient_data_alias(row_in, args):
+    session = args['session']
+
+    try:
+        dst_food = session.\
+            query(model.Food).\
+            filter(model.Food.long_desc == row_in[0]).\
+            one()
+    except sqlalchemy.orm.exc.NoResultFound:
+        raise ValueError("Unable to find destination food '{}'".format(row_in[0]))
+    except sqlalchemy.orm.exc.MultipleResultsFound:
+        raise ValueError("Multiple results of destination food '{}'".format(row_in[0]))
+
+    session.\
+        query(model.FoodNutrientData).\
+        filter(model.FoodNutrientData.food_id == dst_food.id).\
+        delete()
+    session.commit()
+
+    try:
+        src_food = session.\
+            query(model.Food).\
+            filter(model.Food.long_desc == row_in[1]).\
+            one()
+    except sqlalchemy.orm.exc.NoResultFound:
+        raise ValueError("Unable to find source food '{}'".format(row_in[1]))
+    except sqlalchemy.orm.exc.MultipleResultsFound:
+        raise ValueError("Multiple results of source food '{}'".format(row_in[1]))
+
+    src_nutrient_data = session.\
+        query(model.FoodNutrientData).\
+        filter(model.FoodNutrientData.food_id == src_food.id).\
+        all()
+    for nutrient_datum in src_nutrient_data:
+        session.expunge(nutrient_datum)
+        make_transient(nutrient_datum)
+        nutrient_datum.food_id = dst_food.id
+        session.add(nutrient_datum)
+    session.commit()
+
+    return None
+
 def db_import(engine, session, data_dir):
     # Only drop the USDA tables as the model may be extended by another
     # module.
@@ -330,7 +373,7 @@ def db_import_custom(engine, session, data_dir):
 
     import_order = ['local_food.csv', 'local_food_weight.csv', 'local_food_weight_alias.csv',
                     'nutrient_category.csv', 'nutrient_category_map.csv',
-                    'local_food_nutrient_data.csv']
+                    'local_food_nutrient_data.csv', 'local_food_nutrient_data_alias.csv']
     for fname in import_order:
         full_fname = os.path.join(data_dir, fname)
         if os.access(full_fname, os.R_OK):
@@ -360,6 +403,9 @@ def db_import_custom(engine, session, data_dir):
             elif fname == 'local_food_nutrient_data.csv':
                 callback_args['table_class'] = model.FoodNutrientData
                 processing_callback = process_row_local_food_nutrient_data
+            elif fname == 'local_food_nutrient_data_alias.csv':
+                callback_args['table_class'] = model.FoodNutrientData
+                processing_callback = process_row_local_food_nutrient_data_alias
             else:
                 print("No handler for file {}".format(full_fname))
 
