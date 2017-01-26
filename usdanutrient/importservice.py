@@ -5,7 +5,7 @@ import sys
 import csv
 import sqlalchemy.orm.exc
 from sqlalchemy.orm.session import make_transient
-from sqlalchemy import Boolean, Date, func, Integer, Numeric
+from sqlalchemy import and_, Boolean, Date, func, Integer, Numeric
 from datetime import date
 from decimal import Decimal
 import model
@@ -140,6 +140,15 @@ def process_row_local_food_weight(row_in, args):
             filter(model.Food.long_desc == row_in[0]).\
             one()
 
+    session.\
+            query(model.Weight).\
+            filter(and_(
+                model.Weight.food_id == food.id,
+                model.Weight.measurement_desc == row_in[2],
+            )).\
+            delete()
+    session.commit()
+
     prev_sequence = session.\
             query(func.max(model.Weight.sequence)).\
             filter(model.Weight.food_id == food.id).\
@@ -164,6 +173,15 @@ def process_row_local_food_weight_alias(row_in, args):
             query(model.Food).\
             filter(model.Food.long_desc == row_in[0]).\
             one()
+
+    session.\
+            query(model.Weight).\
+            filter(and_(
+                model.Weight.food_id == food.id,
+                model.Weight.measurement_desc == row_in[2],
+            )).\
+            delete()
+    session.commit()
 
     weight = session.\
             query(model.Weight).\
